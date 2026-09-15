@@ -13,8 +13,8 @@ describe("buildMatchingVisionRequest", () => {
         { n: 2, excerpt: "she walked in", prompt: "a woman entering a room" },
       ],
     );
-    expect(images[0].label).toBe("IMAGE 0 (file: a.jpg)");
-    expect(images[1].label).toBe("IMAGE 1 (file: b.jpg)");
+    expect(images[0]!.label).toBe("IMAGE 0 (file: a.jpg)");
+    expect(images[1]!.label).toBe("IMAGE 1 (file: b.jpg)");
     expect(text).toContain("BEAT 1");
     expect(text).toContain("the door opened");
     expect(text).toContain("BEAT 2");

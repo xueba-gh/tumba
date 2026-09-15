@@ -21,7 +21,7 @@ describe("createProvider — anthropic", () => {
     const provider = createProvider(cfg, fetchMock as unknown as typeof fetch);
     const reply = await provider.chat({ messages: [{ role: "user", content: "hi" }] });
     expect(reply).toBe("hello");
-    const [, init] = fetchMock.mock.calls[0];
+    const [, init] = fetchMock.mock.calls[0]!;
     expect((init.headers as Record<string, string>)["x-api-key"]).toBe("sk-test");
   });
 
@@ -57,7 +57,7 @@ describe("createProvider — openai-compatible", () => {
     const provider = createProvider(cfg, fetchMock as unknown as typeof fetch);
     const reply = await provider.chat({ messages: [{ role: "user", content: "hi" }] });
     expect(reply).toBe("reply");
-    const [url] = fetchMock.mock.calls[0];
+    const [url] = fetchMock.mock.calls[0]!;
     expect(url).toBe("http://127.0.0.1:1234/v1/chat/completions");
   });
 });
@@ -73,7 +73,7 @@ describe("createProvider — ollama", () => {
       images: [{ b64: "AAAA", mime: "image/jpeg", label: "IMAGE 0" }],
     });
     expect(reply).toBe("matched");
-    const [, init] = fetchMock.mock.calls[0];
+    const [, init] = fetchMock.mock.calls[0]!;
     const body = JSON.parse(init.body as string);
     expect(body.messages[0].images).toEqual(["AAAA"]);
   });
@@ -89,7 +89,7 @@ describe("createProvider — gemini", () => {
     const provider = createProvider(cfg, fetchMock as unknown as typeof fetch);
     const reply = await provider.chat({ messages: [{ role: "user", content: "hi" }] });
     expect(reply).toBe("hi there");
-    const [url] = fetchMock.mock.calls[0];
+    const [url] = fetchMock.mock.calls[0]!;
     expect(url).toContain("key=gkey");
   });
 });

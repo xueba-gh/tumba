@@ -42,6 +42,15 @@ function countWords(text: string): number {
   return t.split(/\s+/).length;
 }
 
+const isBoundaryChar = (c: string | undefined): boolean =>
+  c === "." || c === "!" || c === "?";
+
+const isClosingChar = (c: string | undefined): boolean =>
+  c !== undefined && /["'”’)\]]/.test(c);
+
+const isSpaceChar = (c: string | undefined): boolean =>
+  c !== undefined && /\s/.test(c);
+
 /** Split raw script text into sentences, abbreviation-aware. */
 export function splitSentences(script: string): Sentence[] {
   const sentences: Sentence[] = [];
@@ -49,48 +58,44 @@ export function splitSentences(script: string): Sentence[] {
   let start = 0;
   let i = 0;
 
-  const isBoundaryChar = (c: string) => c === "." || c === "!" || c === "?";
+  const push = (raw: string): void => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const clean = stripCues(trimmed);
+    sentences.push({ text: trimmed, cleanText: clean, words: countWords(clean) });
+  };
 
   while (i < len) {
-    const c = script[i];
-    if (isBoundaryChar(c)) {
-      // consume any run of ./!/? plus closing quotes/brackets
-      let j = i + 1;
-      while (j < len && (isBoundaryChar(script[j]) || /["'”’\)\]]/.test(script[j]))) {
-        j++;
-      }
-      const precedingWordMatch = script.slice(start, i).match(/([A-Za-z]+)\s*$/);
-      const precedingWord = precedingWordMatch?.[1]?.toLowerCase();
-      const isAbbrev = !!precedingWord && ABBREVIATIONS.has(precedingWord);
-
-      // find next non-space char after the boundary run
-      let k = j;
-      while (k < len && /\s/.test(script[k])) k++;
-      const nextChar = script[k];
-      const nextIsLowercase = !!nextChar && /[a-z]/.test(nextChar);
-
-      const isRealBoundary = !isAbbrev && !nextIsLowercase;
-
-      if (isRealBoundary || j >= len) {
-        const raw = script.slice(start, j).trim();
-        if (raw) {
-          const clean = stripCues(raw);
-          sentences.push({ text: raw, cleanText: clean, words: countWords(clean) });
-        }
-        start = j;
-        i = j;
-        continue;
-      }
-      i = j;
+    if (!isBoundaryChar(script[i])) {
+      i++;
       continue;
     }
-    i++;
+
+    // consume any run of ./!/? plus closing quotes/brackets
+    let j = i + 1;
+    while (j < len && (isBoundaryChar(script[j]) || isClosingChar(script[j]))) {
+      j++;
+    }
+
+    const precedingWord = script.slice(start, i).match(/([A-Za-z]+)\s*$/)?.[1]?.toLowerCase();
+    const isAbbrev = precedingWord !== undefined && ABBREVIATIONS.has(precedingWord);
+
+    // find the next non-space char after the boundary run
+    let k = j;
+    while (k < len && isSpaceChar(script[k])) k++;
+    const nextChar = script[k];
+    const nextIsLowercase = nextChar !== undefined && /[a-z]/.test(nextChar);
+
+    const isRealBoundary = !isAbbrev && !nextIsLowercase;
+
+    if (isRealBoundary || j >= len) {
+      push(script.slice(start, j));
+      start = j;
+    }
+    i = j;
   }
-  const tail = script.slice(start).trim();
-  if (tail) {
-    const clean = stripCues(tail);
-    sentences.push({ text: tail, cleanText: clean, words: countWords(clean) });
-  }
+
+  push(script.slice(start));
   return sentences;
 }
 
@@ -123,10 +128,13 @@ export function splitIntoBeats(script: string, opts: SplitOptions = {}): Beat[] 
   // merge a trailing group under 12 words into the previous one
   if (groups.length > 1) {
     const last = groups[groups.length - 1];
-    const lastWords = last.reduce((a, s) => a + s.words, 0);
-    if (lastWords < 12) {
-      groups[groups.length - 2] = [...groups[groups.length - 2], ...last];
-      groups.pop();
+    const previous = groups[groups.length - 2];
+    if (last && previous) {
+      const lastWords = last.reduce((a, s) => a + s.words, 0);
+      if (lastWords < 12) {
+        groups[groups.length - 2] = [...previous, ...last];
+        groups.pop();
+      }
     }
   }
 
@@ -136,7 +144,7 @@ export function splitIntoBeats(script: string, opts: SplitOptions = {}): Beat[] 
     type: "image" as const,
   }));
 
-  // verify: sum of words across beats (cues stripped) == words in the script (cues stripped)
+  // verify: sum of words across beats (cues stripped) == words in the script
   const scriptWords = countWords(stripCues(script));
   const beatWords = beats.reduce((a, b) => a + countWords(stripCues(b.text)), 0);
   if (beatWords !== scriptWords) {

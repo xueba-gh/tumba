@@ -6,8 +6,8 @@ describe("splitSentences", () => {
     const script = "Mrs. Benn walked into the room. She looked tired.";
     const sentences = splitSentences(script);
     expect(sentences.length).toBe(2);
-    expect(sentences[0].text).toContain("Mrs. Benn walked into the room.");
-    expect(sentences[1].text).toContain("She looked tired.");
+    expect(sentences[0]!.text).toContain("Mrs. Benn walked into the room.");
+    expect(sentences[1]!.text).toContain("She looked tired.");
   });
 
   it("does not split when the next character is lowercase (e.g. 'St. james')", () => {
@@ -26,7 +26,7 @@ describe("splitSentences", () => {
     const script = '"Hello there." she said. Then she left.';
     const sentences = splitSentences(script);
     expect(sentences.length).toBe(2);
-    expect(sentences[0].text).toBe('"Hello there." she said.');
+    expect(sentences[0]!.text).toBe('"Hello there." she said.');
   });
 });
 
@@ -40,9 +40,12 @@ describe("splitIntoBeats", () => {
     const beats = splitIntoBeats(longScript, { targetWords: 25, minWords: 20, maxWords: 35 });
     expect(beats.length).toBeGreaterThan(1);
     expect(verifyWordCount(longScript, beats)).toBe(true);
+  });
+
+  it("every beat's text appears verbatim in the original script", () => {
+    const beats = splitIntoBeats(longScript, { targetWords: 25, minWords: 20, maxWords: 35 });
     for (const beat of beats) {
-      // every beat's text should be composed of whole sentences from the script
-      expect(longScript).toContain(beat.text.split(" This is sentence")[0]);
+      expect(longScript).toContain(beat.text);
     }
   });
 

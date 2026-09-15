@@ -20,20 +20,20 @@ export interface EncryptedBlob {
 }
 
 function toB64(bytes: ArrayBuffer | Uint8Array): string {
-  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const arr: Uint8Array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let bin = "";
-  for (const b of arr) bin += String.fromCharCode(b);
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]!);
   return btoa(bin);
 }
 
-function fromB64(s: string): Uint8Array {
+function fromB64(s: string): Uint8Array<ArrayBuffer> {
   const bin = atob(s);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return arr;
 }
 
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(passphrase: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const subtle = getSubtle();
   const keyMaterial = await subtle.importKey(
     "raw",
@@ -59,15 +59,17 @@ function getSubtle(): SubtleCrypto {
   return c.subtle;
 }
 
-function getRandomValues(bytes: Uint8Array): Uint8Array {
+function randomBytes(len: number): Uint8Array<ArrayBuffer> {
   const c = (globalThis as { crypto?: Crypto }).crypto;
   if (!c) throw new Error("WebCrypto is not available in this environment");
-  return c.getRandomValues(bytes);
+  const bytes = new Uint8Array(len);
+  c.getRandomValues(bytes);
+  return bytes;
 }
 
 export async function encryptSecret(plaintext: string, passphrase: string): Promise<EncryptedBlob> {
-  const salt = getRandomValues(new Uint8Array(SALT_BYTES));
-  const iv = getRandomValues(new Uint8Array(IV_BYTES));
+  const salt = randomBytes(SALT_BYTES);
+  const iv = randomBytes(IV_BYTES);
   const key = await deriveKey(passphrase, salt);
   const subtle = getSubtle();
   const ciphertext = await subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(plaintext));

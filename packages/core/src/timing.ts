@@ -20,6 +20,17 @@ function normalise(text: string): string {
     .trim();
 }
 
+/** Fill in each segment's duration: it runs until the next one starts. */
+function fillDurations(segs: TimedSegment[], audioDurationSec: number): TimedSegment[] {
+  for (let i = 0; i < segs.length; i++) {
+    const current = segs[i];
+    if (!current) continue;
+    const next = segs[i + 1]?.start ?? audioDurationSec;
+    current.dur = Math.max(0.05, round3(next - current.start));
+  }
+  return segs;
+}
+
 /**
  * Proportional (fallback, no AI): each beat starts where its excerpt's
  * first words appear in the normalised narration; offset/total-chars scaled
@@ -40,16 +51,15 @@ export function computeProportionalTiming(
   let last = 0;
   for (const beat of use) {
     const anchorFull = normalise(beat.text);
-    const anchor = anchorFull.split("...")[0].trim();
+    const anchor = (anchorFull.split("...")[0] ?? anchorFull).trim();
     let idx = -1;
     let found = false;
     for (const length of [60, 40, 25, 15]) {
-      const a = anchor.slice(0, length).trim();
-      if (a.length < 8) continue;
-      const from = Math.max(0, last - 5);
-      const found_idx = text.indexOf(a, from);
-      if (found_idx !== -1) {
-        idx = found_idx;
+      const candidate = anchor.slice(0, length).trim();
+      if (candidate.length < 8) continue;
+      const at = text.indexOf(candidate, Math.max(0, last - 5));
+      if (at !== -1) {
+        idx = at;
         found = true;
         break;
       }
@@ -59,19 +69,15 @@ export function computeProportionalTiming(
     last = idx;
   }
 
-  const firstOff = offsets.length > 0 ? offsets[0].idx : 0;
+  const firstOff = offsets[0]?.idx ?? 0;
   const span = total - firstOff > 0 ? total - firstOff : total;
 
   const segs: TimedSegment[] = offsets.map(({ beat, idx, found }, i) => {
-    let t = ((idx - firstOff) / span) * audioDurationSec;
-    if (i === 0) t = 0;
-    return { n: beat.n, start: Math.max(0, round3(t)), found };
+    const t = i === 0 ? 0 : ((idx - firstOff) / span) * audioDurationSec;
+    return { n: beat.n, start: Math.max(0, round3(t)), dur: 0, found };
   });
-  for (let i = 0; i < segs.length; i++) {
-    const next = i + 1 < segs.length ? segs[i + 1].start : audioDurationSec;
-    segs[i].dur = Math.max(0.05, round3(next - segs[i].start));
-  }
-  return segs;
+
+  return fillDurations(segs, audioDurationSec);
 }
 
 /**
@@ -90,40 +96,33 @@ export function computeAlignedTiming(
 ): TimedSegment[] {
   const use = beats.filter((b) => b.n >= startAtBeat).sort((a, b) => a.n - b.n);
   let cursor = 0;
-  const raw: { n: number; start: number | null; endGuess: number }[] = [];
+  const raw: { n: number; start: number | null }[] = [];
 
   for (const beat of use) {
     const wordCount = countWords(normalise(beat.text));
     const slice = wordTimings.slice(cursor, cursor + wordCount);
     cursor += wordCount;
-    if (slice.length > 0) {
-      raw.push({ n: beat.n, start: slice[0].start, endGuess: slice[slice.length - 1].end });
-    } else {
-      raw.push({ n: beat.n, start: null, endGuess: audioDurationSec });
-    }
+    const firstWord = slice[0];
+    raw.push({ n: beat.n, start: firstWord ? firstWord.start : null });
   }
 
   // interpolate any beat with no aligned words from its neighbours
   for (let i = 0; i < raw.length; i++) {
-    if (raw[i].start === null) {
-      const prev = i > 0 ? raw[i - 1].start : 0;
-      const nextFound = raw.slice(i + 1).find((r) => r.start !== null)?.start;
-      const next = nextFound ?? audioDurationSec;
-      raw[i].start = ((prev ?? 0) + next) / 2;
-    }
+    const current = raw[i];
+    if (!current || current.start !== null) continue;
+    const previous = i > 0 ? raw[i - 1]?.start ?? 0 : 0;
+    const nextFound = raw.slice(i + 1).find((r) => r.start !== null)?.start;
+    current.start = (previous + (nextFound ?? audioDurationSec)) / 2;
   }
 
-  const segs: TimedSegment[] = raw.map((r, i) => ({
+  const segs: TimedSegment[] = raw.map((r) => ({
     n: r.n,
-    start: round3(r.start as number),
+    start: round3(r.start ?? 0),
     dur: 0,
     found: true,
   }));
-  for (let i = 0; i < segs.length; i++) {
-    const next = i + 1 < segs.length ? segs[i + 1].start : audioDurationSec;
-    segs[i].dur = Math.max(0.05, round3(next - segs[i].start));
-  }
-  return segs;
+
+  return fillDurations(segs, audioDurationSec);
 }
 
 /** Enforce min/max hold by merging (too-short) or flagging (too-long, split preferred upstream). */
@@ -135,9 +134,9 @@ export function enforceHoldLimits(
   const overMax = segs.filter((s) => s.dur > maxHoldSec).map((s) => s.n);
   const merged: TimedSegment[] = [];
   for (const s of segs) {
-    const prev = merged[merged.length - 1];
-    if (prev && prev.dur < minHoldSec) {
-      prev.dur = round3(prev.dur + s.dur);
+    const previous = merged[merged.length - 1];
+    if (previous && previous.dur < minHoldSec) {
+      previous.dur = round3(previous.dur + s.dur);
     } else {
       merged.push({ ...s });
     }
