@@ -7,8 +7,7 @@ narrated, image-driven video: book channels, documentaries, explainers,
 course lessons, faceless YouTube content, and more.
 
 This repo is being built phase by phase per `docs/build-package/03_BUILD_PROMPTS.md`.
-Status: **Phase 0 complete** (build package committed; monorepo scaffold not
-yet started).
+Status: **Phase 1 complete, unverified** — monorepo scaffolded (`packages/core`, `packages/ai`, `apps/web` Settings page). Not yet run through `pnpm install`/lint/typecheck/tests in this session (see `docs/DECISIONS.md`) — run those yourself before we start Phase 2.
 
 ## What's here right now
 
