@@ -84,7 +84,7 @@ export async function decryptSecret(blob: EncryptedBlob, passphrase: string): Pr
   try {
     const plaintext = await subtle.decrypt({ name: "AES-GCM", iv }, key, fromB64(blob.ciphertext));
     return new TextDecoder().decode(plaintext);
-  } catch (err) {
+  } catch {
     throw new Error("Could not decrypt — wrong passphrase or corrupted data");
   }
 }

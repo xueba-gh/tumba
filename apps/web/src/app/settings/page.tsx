@@ -61,7 +61,7 @@ function AddProviderForm() {
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        Label (e.g. "claude-main", "ollama-home")
+        {'Label (e.g. "claude-main", "ollama-home")'}
         <input
           className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
           value={label}
