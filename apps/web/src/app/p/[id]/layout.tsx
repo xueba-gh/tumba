@@ -3,7 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import type { Project } from "@nva/core";
-import { getProject } from "@/lib/projectStorage";
+import { getProject, onProjectSaved } from "@/lib/projectStorage";
 import { ProjectNav } from "@/components/ProjectNav";
 import { EmptyState } from "@/components/ui";
 
@@ -36,6 +36,16 @@ export default function ProjectLayout({
       active = false;
     };
   }, [params.id]);
+
+  // Step pages own the project data and save it themselves; without this the
+  // pipeline nav would keep showing the state from this layout's first mount.
+  useEffect(
+    () =>
+      onProjectSaved((saved) => {
+        if (saved.id === params.id) setProject(saved);
+      }),
+    [params.id],
+  );
 
   if (status === "loading") {
     // Fixed-height skeleton matching the loaded layout, so nothing shifts.

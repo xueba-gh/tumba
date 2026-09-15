@@ -2,6 +2,7 @@
 
 import type {
   ButtonHTMLAttributes,
+  HTMLAttributes,
   InputHTMLAttributes,
   ReactNode,
   SelectHTMLAttributes,
@@ -168,9 +169,11 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
 
 /* -------------------------------------------------------------------- Card */
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cx("rounded-lg border border-border bg-surface", className)}>{children}</div>
+    <div className={cx("rounded-lg border border-border bg-surface", className)} {...rest}>
+      {children}
+    </div>
   );
 }
 

@@ -1,3 +1,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Build scripts are blocked by default in pnpm 10. These two are required:
+#   esbuild        — vitest's bundler; postinstall resolves the platform binary
+#   unrs-resolver  — native resolver used by eslint-plugin-import-x (via eslint-config-next)
+onlyBuiltDependencies:
+  - esbuild
+  - unrs-resolver

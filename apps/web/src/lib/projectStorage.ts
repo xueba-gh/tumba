@@ -155,6 +155,27 @@ export async function saveProject(project: Project): Promise<void> {
   }
 
   updateIndexForProject(updatedProject);
+  notifyProjectSaved(updatedProject);
+}
+
+/**
+ * Fired after every successful save so shells that render project-derived UI
+ * (the pipeline nav, for one) can re-read instead of holding a stale copy from
+ * their own mount.
+ */
+export const PROJECT_SAVED_EVENT = "nva:project-saved";
+
+function notifyProjectSaved(project: Project) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<Project>(PROJECT_SAVED_EVENT, { detail: project }));
+}
+
+/** Subscribe to saves. Returns an unsubscribe function. */
+export function onProjectSaved(listener: (project: Project) => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const handler = (e: Event) => listener((e as CustomEvent<Project>).detail);
+  window.addEventListener(PROJECT_SAVED_EVENT, handler);
+  return () => window.removeEventListener(PROJECT_SAVED_EVENT, handler);
 }
 
 /** Create a new blank Project */
@@ -339,6 +360,30 @@ export async function getAssetBlob(projectId: string, fileName: string): Promise
     }
   }
   return null;
+}
+
+/**
+ * Remove a media file from OPFS and drop its cached Object URL.
+ * Safe to call for a file that is already gone.
+ */
+export async function deleteAssetFile(projectId: string, fileName: string): Promise<void> {
+  const cacheKey = `${projectId}/${fileName}`;
+  const cachedUrl = blobUrlCache.get(cacheKey);
+  if (cachedUrl) {
+    URL.revokeObjectURL(cachedUrl);
+    blobUrlCache.delete(cacheKey);
+  }
+
+  const projectsDir = await getProjectsDir();
+  if (!projectsDir) return;
+
+  try {
+    const projDir = await projectsDir.getDirectoryHandle(projectId);
+    const mediaDir = await projDir.getDirectoryHandle("media");
+    await mediaDir.removeEntry(fileName);
+  } catch {
+    // Already absent, or OPFS unavailable — nothing to clean up.
+  }
 }
 
 /** Get cached or create Object URL for a media asset */

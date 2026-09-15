@@ -30,16 +30,22 @@ export function ProjectNav({ project }: ProjectNavProps) {
 
   const hasMedia = project.assets.length > 0 || Boolean(project.audio.fileRef);
   const hasBeats = project.beats.length > 0;
+  const fullyMatched = hasBeats && project.beats.every((b) => Boolean(b.assetId));
 
   function stateOf(slug: string, isActive: boolean): StepState {
     if (isActive) return "current";
     if (slug === "import") return hasMedia ? "done" : "available";
     if (slug === "script") return hasBeats ? "done" : hasMedia ? "available" : "locked";
-    return hasBeats ? "available" : "locked";
+    if (!hasBeats) return "locked";
+    if (slug === "match") return fullyMatched ? "done" : "available";
+    // Rendering needs a visual on every beat, so it stays locked until then.
+    if (slug === "render") return fullyMatched ? "available" : "locked";
+    return "available";
   }
 
   function lockReason(slug: string): string {
     if (slug === "script") return "Import media first";
+    if (slug === "render") return "Match a visual to every beat first";
     return "Split the script into beats first";
   }
 

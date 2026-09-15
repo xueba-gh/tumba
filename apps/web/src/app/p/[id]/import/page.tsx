@@ -8,6 +8,7 @@ import {
   saveAssetFile,
   getAssetUrl,
   getAssetBlob,
+  deleteAssetFile,
 } from "@/lib/projectStorage";
 import { computeImageHash, findNearDuplicates, type NearDuplicateGroup } from "@/lib/imageHash";
 import { extractAudioPeaks } from "@/lib/audioPeaks";
@@ -29,6 +30,25 @@ const KIND_ICON: Record<AssetKind, IconName> = {
   clip: "video",
   audio: "audio",
 };
+
+/** Containers that carry an audio track, so either role is legitimate. */
+const VIDEO_EXTS = [".mp4", ".webm", ".mov", ".m4v"];
+const AUDIO_EXTS = [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac", ".opus"];
+
+function hasExt(name: string, exts: string[]): boolean {
+  const lower = name.toLowerCase();
+  return exts.some((e) => lower.endsWith(e));
+}
+
+/** True when the file could serve as the narration track. */
+function canBeVoiceOver(name: string): boolean {
+  return hasExt(name, VIDEO_EXTS) || hasExt(name, AUDIO_EXTS);
+}
+
+/** True when the file is a video container, so it can also be a b-roll clip. */
+function canBeClip(name: string): boolean {
+  return hasExt(name, VIDEO_EXTS);
+}
 
 export default function ImportPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = use(paramsPromise);
@@ -194,11 +214,130 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
     setProject(updated);
   }
 
+  /**
+   * Removes the asset, the file behind it, and every reference to it: the
+   * narration track if this was it, and any beat that had it assigned.
+   * Without this the project keeps a fileRef to bytes that no longer exist.
+   */
   async function deleteAsset(assetId: string) {
     if (!project) return;
-    const updatedAssets = project.assets.filter((a) => a.id !== assetId);
-    const updated = { ...project, assets: updatedAssets };
+    const target = project.assets.find((a) => a.id === assetId);
+    if (!target) return;
+
+    const wasVoiceOver = project.audio.fileRef === target.fileRef;
+    const stillReferenced = project.assets.some(
+      (a) => a.id !== assetId && a.fileRef === target.fileRef,
+    );
+
+    const updated: Project = {
+      ...project,
+      assets: project.assets.filter((a) => a.id !== assetId),
+      beats: project.beats.map((b) =>
+        b.assetId === assetId ? { ...b, assetId: undefined, confidence: undefined } : b,
+      ),
+      audio: wasVoiceOver
+        ? { ...project.audio, fileRef: "", durationSec: 0 }
+        : project.audio,
+    };
+
     await saveProject(updated);
+    // Two assets can point at one file after a duplicate import; only drop the
+    // bytes when nothing else needs them.
+    if (!stillReferenced) await deleteAssetFile(project.id, target.fileRef);
+
+    if (wasVoiceOver) {
+      setAudioPeaks([]);
+      setIsPlayingAudio(false);
+    }
+    await loadProjectData();
+  }
+
+  /**
+   * Promote any file with an audio track to the narration. Covers the common
+   * case of an .mp4 whose name gave no hint that it is the voice-over.
+   */
+  async function useAsVoiceOver(assetId: string) {
+    if (!project) return;
+    const target = project.assets.find((a) => a.id === assetId);
+    if (!target) return;
+
+    setProcessing(true);
+    try {
+      const blob = await getAssetBlob(project.id, target.fileRef);
+      if (!blob) {
+        setProcessing(false);
+        return;
+      }
+
+      const { durationSec, peaks } = await extractAudioPeaks(blob);
+
+      const updated: Project = {
+        ...project,
+        // Only one narration track: demote whichever asset held the role.
+        assets: project.assets.map((a) => {
+          if (a.id === assetId) return { ...a, kind: "audio" as AssetKind, spare: false };
+          if (a.kind === "audio" && a.fileRef === project.audio.fileRef) {
+            return { ...a, kind: canBeClip(a.name) ? ("clip" as AssetKind) : a.kind };
+          }
+          return a;
+        }),
+        // A narration track is not a visual, so drop it from any beat.
+        beats: project.beats.map((b) =>
+          b.assetId === assetId ? { ...b, assetId: undefined, confidence: undefined } : b,
+        ),
+        audio: { ...project.audio, fileRef: target.fileRef, durationSec },
+      };
+
+      await saveProject(updated);
+      setAudioPeaks(peaks);
+      setIsPlayingAudio(false);
+      await loadProjectData();
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  /** Demote the narration back to a b-roll clip, clearing the audio track. */
+  async function useAsClip(assetId: string) {
+    if (!project) return;
+    const target = project.assets.find((a) => a.id === assetId);
+    if (!target) return;
+
+    const wasVoiceOver = project.audio.fileRef === target.fileRef;
+    const updated: Project = {
+      ...project,
+      assets: project.assets.map((a) =>
+        a.id === assetId ? { ...a, kind: "clip" as AssetKind } : a,
+      ),
+      audio: wasVoiceOver ? { ...project.audio, fileRef: "", durationSec: 0 } : project.audio,
+    };
+
+    await saveProject(updated);
+    if (wasVoiceOver) {
+      setAudioPeaks([]);
+      setIsPlayingAudio(false);
+    }
+    await loadProjectData();
+  }
+
+  /** Clear the narration track without touching the underlying file. */
+  async function clearVoiceOver() {
+    if (!project) return;
+    const current = project.assets.find((a) => a.fileRef === project.audio.fileRef);
+
+    const updated: Project = {
+      ...project,
+      assets: current
+        ? project.assets.map((a) =>
+            a.id === current.id && canBeClip(a.name) ? { ...a, kind: "clip" as AssetKind } : a,
+          )
+        : project.assets,
+      audio: { ...project.audio, fileRef: "", durationSec: 0 },
+    };
+
+    await saveProject(updated);
+    setAudioPeaks([]);
+    setIsPlayingAudio(false);
     await loadProjectData();
   }
 
@@ -290,25 +429,31 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
               <span className="tabular rounded-sm border border-border bg-bg px-1.5 py-0.5 font-mono text-overline text-fg-muted">
                 {project.audio.durationSec.toFixed(1)}s
               </span>
+              <span className="truncate text-label text-fg-muted">{project.audio.fileRef}</span>
             </div>
 
-            {assetUrls.has(project.audio.fileRef) ? (
-              <Button
-                icon={isPlayingAudio ? "pause" : "play"}
-                onClick={() => {
-                  if (!audioRef.current) return;
-                  if (isPlayingAudio) {
-                    audioRef.current.pause();
-                    setIsPlayingAudio(false);
-                  } else {
-                    void audioRef.current.play();
-                    setIsPlayingAudio(true);
-                  }
-                }}
-              >
-                {isPlayingAudio ? "Pause" : "Play"}
+            <div className="flex items-center gap-2">
+              {assetUrls.has(project.audio.fileRef) ? (
+                <Button
+                  icon={isPlayingAudio ? "pause" : "play"}
+                  onClick={() => {
+                    if (!audioRef.current) return;
+                    if (isPlayingAudio) {
+                      audioRef.current.pause();
+                      setIsPlayingAudio(false);
+                    } else {
+                      void audioRef.current.play();
+                      setIsPlayingAudio(true);
+                    }
+                  }}
+                >
+                  {isPlayingAudio ? "Pause" : "Play"}
+                </Button>
+              ) : null}
+              <Button variant="ghost" icon="close" onClick={() => void clearVoiceOver()}>
+                Remove
               </Button>
-            ) : null}
+            </div>
           </div>
 
           <audio
@@ -385,6 +530,8 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
             {filteredAssets.map((asset) => {
               const url = assetUrls.get(asset.id);
               const variantInfo = variantsMap.get(asset.id);
+              const isVoiceOver =
+                Boolean(project.audio.fileRef) && project.audio.fileRef === asset.fileRef;
 
               return (
                 <li key={asset.id}>
@@ -406,7 +553,13 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
                         </div>
                       )}
 
-                      {asset.spare ? (
+                      {isVoiceOver ? (
+                        <div className="absolute left-2 top-2">
+                          <Badge tone="accent" icon="audio">
+                            Voice-over
+                          </Badge>
+                        </div>
+                      ) : asset.spare ? (
                         <div className="absolute left-2 top-2">
                           <Badge tone="warning">Spare</Badge>
                         </div>
@@ -439,26 +592,60 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between gap-1 border-t border-border pt-2">
-                        <button
-                          type="button"
-                          onClick={() => void toggleSpare(asset.id)}
-                          aria-pressed={asset.spare}
-                          className={cx(
-                            "cursor-pointer rounded-sm px-1 text-label font-medium transition-colors",
-                            asset.spare ? "text-warning hover:text-fg" : "text-fg-muted hover:text-fg",
-                          )}
-                        >
-                          {asset.spare ? "Unmark spare" : "Mark spare"}
-                        </button>
+                      <div className="flex flex-col gap-1 border-t border-border pt-2">
+                        {/* Anything with an audio track can play either role,
+                            and filename guessing gets it wrong often enough
+                            (an .mp4 voice-over), so let the user decide. */}
+                        {canBeVoiceOver(asset.name) ? (
+                          isVoiceOver ? (
+                            canBeClip(asset.name) ? (
+                              <button
+                                type="button"
+                                onClick={() => void useAsClip(asset.id)}
+                                className="cursor-pointer rounded-sm px-1 text-left text-label font-medium text-fg-muted transition-colors hover:text-fg"
+                              >
+                                Use as clip instead
+                              </button>
+                            ) : null
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void useAsVoiceOver(asset.id)}
+                              disabled={processing}
+                              className="cursor-pointer rounded-sm px-1 text-left text-label font-medium text-accent transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Use as voice-over
+                            </button>
+                          )
+                        ) : null}
 
-                        <IconButton
-                          label={`Delete ${asset.name}`}
-                          icon="trash"
-                          size="sm"
-                          className="text-fg-subtle hover:bg-destructive-subtle hover:text-destructive"
-                          onClick={() => void deleteAsset(asset.id)}
-                        />
+                        <div className="flex items-center justify-between gap-1">
+                          {isVoiceOver ? (
+                            <span className="px-1 text-label text-fg-subtle">Narration track</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void toggleSpare(asset.id)}
+                              aria-pressed={asset.spare}
+                              className={cx(
+                                "cursor-pointer rounded-sm px-1 text-label font-medium transition-colors",
+                                asset.spare
+                                  ? "text-warning hover:text-fg"
+                                  : "text-fg-muted hover:text-fg",
+                              )}
+                            >
+                              {asset.spare ? "Unmark spare" : "Mark spare"}
+                            </button>
+                          )}
+
+                          <IconButton
+                            label={`Delete ${asset.name}`}
+                            icon="trash"
+                            size="sm"
+                            className="text-fg-subtle hover:bg-destructive-subtle hover:text-destructive"
+                            onClick={() => void deleteAsset(asset.id)}
+                          />
+                        </div>
                       </div>
                     </div>
                   </Card>

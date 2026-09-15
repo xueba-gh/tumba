@@ -261,6 +261,12 @@ export default function ProjectsPage() {
               <li key={p.id}>
                 <Card className="flex flex-col gap-3 px-4 py-3 transition-colors hover:border-border-strong sm:flex-row sm:items-center sm:gap-4">
                   <div className="min-w-0 flex-1">
+                    <button
+                      onClick={handleCreateSample}
+                      className="rounded-lg border border-neutral-300 px-4 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                    >
+                      Load sample
+                    </button>
                     {renamingId === p.id ? (
                       <form
                         className="flex items-center gap-2"
