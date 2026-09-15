@@ -83,4 +83,39 @@ describe("enforceHoldLimits", () => {
     expect(merged[0]!.dur).toBeCloseTo(11, 5);
     expect(overMax).toEqual([3]);
   });
+
+  it("never drops the beat AFTER a too-short one", () => {
+    // Regression: a short beat must be absorbed by its predecessor. Letting it
+    // absorb its successor instead would silently remove that beat's image
+    // from the rendered video.
+    const segs = [
+      { n: 1, start: 0, dur: 10 },
+      { n: 2, start: 10, dur: 1 },
+      { n: 3, start: 11, dur: 20 },
+    ];
+    const { segs: merged } = enforceHoldLimits(segs, 2, 15);
+    expect(merged.map((s) => s.n)).toEqual([1, 3]);
+    expect(merged.find((s) => s.n === 3)?.dur).toBeCloseTo(20, 5);
+  });
+
+  it("hands a leading short beat's time to the beat that follows", () => {
+    const segs = [
+      { n: 1, start: 0, dur: 0.5 },
+      { n: 2, start: 0.5, dur: 10 },
+    ];
+    const { segs: merged } = enforceHoldLimits(segs, 2, 15);
+    expect(merged.map((s) => s.n)).toEqual([2]);
+    expect(merged[0]!.start).toBe(0);
+    expect(merged[0]!.dur).toBeCloseTo(10.5, 5);
+  });
+
+  it("leaves segments alone when every beat clears minHold", () => {
+    const segs = [
+      { n: 1, start: 0, dur: 5 },
+      { n: 2, start: 5, dur: 6 },
+    ];
+    const { segs: merged, overMax } = enforceHoldLimits(segs, 2, 15);
+    expect(merged.map((s) => s.n)).toEqual([1, 2]);
+    expect(overMax).toEqual([]);
+  });
 });

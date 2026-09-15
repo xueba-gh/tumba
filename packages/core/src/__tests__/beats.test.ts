@@ -64,9 +64,26 @@ describe("splitIntoBeats", () => {
     expect(beats.map((b) => b.n)).toEqual(beats.map((_, i) => i + 1));
   });
 
-  it("merges a trailing group under 12 words into the previous beat", () => {
-    const script = "First sentence with plenty of words to fill a beat nicely here. Short one.";
-    const beats = splitIntoBeats(script, { targetWords: 100, minWords: 1, maxWords: 200 });
+  it("merges a stub trailing group into the previous beat at the spec defaults", () => {
+    // Three 12-word sentences close a group at 36 words (>= the default
+    // 32-word target); the 3-word tail that follows is then merged back in.
+    const body = Array.from(
+      { length: 3 },
+      (_, i) => `Sentence number ${i + 1} runs on for a little while with several words.`,
+    ).join(" ");
+    const script = `${body} Short tail here.`;
+    const beats = splitIntoBeats(script);
     expect(beats.length).toBe(1);
+    expect(verifyWordCount(script, beats)).toBe(true);
+  });
+
+  it("keeps a short trailing beat when smaller beats are configured", () => {
+    // The spec's 12-word tail rule assumes the default 25-40 word target. With
+    // a 4-word target a 5-word tail is a legitimate beat, not a stub, and must
+    // not be swallowed by the beat before it.
+    const script = "First beat here now. Second beat right after that.";
+    const beats = splitIntoBeats(script, { targetWords: 4, minWords: 2, maxWords: 6 });
+    expect(beats.length).toBe(2);
+    expect(beats[1]!.text).toBe("Second beat right after that.");
   });
 });

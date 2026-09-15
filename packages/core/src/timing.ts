@@ -125,22 +125,40 @@ export function computeAlignedTiming(
   return fillDurations(segs, audioDurationSec);
 }
 
-/** Enforce min/max hold by merging (too-short) or flagging (too-long, split preferred upstream). */
+/**
+ * Enforce min/max hold. A beat under minHold is absorbed by the beat BEFORE
+ * it (its neighbour simply stays on screen longer); it must never absorb the
+ * beat after it, which would drop that beat's image from the video entirely.
+ * A leading short beat has no predecessor, so it is absorbed by the beat that
+ * follows, which then starts earlier. Beats over maxHold are reported rather
+ * than split here — splitting is a script-level operation done upstream.
+ */
 export function enforceHoldLimits(
   segs: TimedSegment[],
   minHoldSec: number,
   maxHoldSec: number,
 ): { segs: TimedSegment[]; overMax: number[] } {
-  const overMax = segs.filter((s) => s.dur > maxHoldSec).map((s) => s.n);
   const merged: TimedSegment[] = [];
   for (const s of segs) {
     const previous = merged[merged.length - 1];
-    if (previous && previous.dur < minHoldSec) {
+    if (previous && s.dur < minHoldSec) {
       previous.dur = round3(previous.dur + s.dur);
-    } else {
-      merged.push({ ...s });
+      continue;
     }
+    merged.push({ ...s });
   }
+
+  // a leading beat under minHold has nothing before it to merge into, so it
+  // hands its time to the beat that follows
+  const first = merged[0];
+  const second = merged[1];
+  if (first && second && first.dur < minHoldSec) {
+    second.start = first.start;
+    second.dur = round3(second.dur + first.dur);
+    merged.shift();
+  }
+
+  const overMax = merged.filter((s) => s.dur > maxHoldSec).map((s) => s.n);
   return { segs: merged, overMax };
 }
 

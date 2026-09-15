@@ -23,6 +23,13 @@ export interface SplitOptions {
   /** Optional: cap a beat's word count harder if maxHoldSec/wordsPerSec implies it. */
   maxHoldSec?: number;
   wordsPerSecEstimate?: number;
+  /**
+   * A trailing group shorter than this is merged back into the previous beat.
+   * Defaults to min(12, minWords): the spec's 12-word rule assumes the default
+   * 25-40 word target, so when the caller configures smaller beats a short tail
+   * is a legitimate beat and must not be swallowed.
+   */
+  mergeTailBelowWords?: number;
 }
 
 interface Sentence {
@@ -125,13 +132,14 @@ export function splitIntoBeats(script: string, opts: SplitOptions = {}): Beat[] 
   }
   if (current.length > 0) groups.push(current);
 
-  // merge a trailing group under 12 words into the previous one
+  // merge a stub trailing group into the previous one
+  const mergeTailBelow = opts.mergeTailBelowWords ?? Math.min(12, minWords);
   if (groups.length > 1) {
     const last = groups[groups.length - 1];
     const previous = groups[groups.length - 2];
     if (last && previous) {
       const lastWords = last.reduce((a, s) => a + s.words, 0);
-      if (lastWords < 12) {
+      if (lastWords < mergeTailBelow) {
         groups[groups.length - 2] = [...previous, ...last];
         groups.pop();
       }
