@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build output
+.next/
+dist/
+build/
+*.tsbuildinfo
+
+# Secrets — never commit keys, tokens, or config with credentials
+*.env
+*.env.*
+!*.env.example
+config.json
+**/agent/config.json
+
+# User media — never committed, projects are exported as zips by the user
+media/
+*.mp4
+*.wav
+*.mp3
+*.mov
+*.webm
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.zip
+!samples/**/*.zip
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
