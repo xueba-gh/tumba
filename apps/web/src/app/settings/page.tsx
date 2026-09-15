@@ -3,15 +3,38 @@
 import { useState } from "react";
 import { useProviderStore, type StoredProvider } from "@/lib/providerStore";
 import type { ProviderKind } from "@nva/ai";
+import { Icon } from "@/components/Icon";
+import { PageHeader, PageShell } from "@/components/PageHeader";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Modal,
+  Select,
+  SectionHeading,
+} from "@/components/ui";
 
 const PROVIDER_KINDS: { value: ProviderKind; label: string; needsBaseUrl: boolean }[] = [
   { value: "anthropic", label: "Anthropic", needsBaseUrl: false },
   { value: "openai", label: "OpenAI", needsBaseUrl: false },
   { value: "gemini", label: "Google Gemini", needsBaseUrl: false },
   { value: "ollama", label: "Ollama (local)", needsBaseUrl: true },
-  { value: "openai-compatible", label: "OpenAI-compatible (LM Studio, vLLM, ...)", needsBaseUrl: true },
+  {
+    value: "openai-compatible",
+    label: "OpenAI-compatible (LM Studio, vLLM, …)",
+    needsBaseUrl: true,
+  },
   { value: "openrouter", label: "OpenRouter", needsBaseUrl: false },
 ];
+
+const ROLE_LABELS: Record<StoredProvider["role"], string> = {
+  both: "Vision + text",
+  vision: "Vision only",
+  text: "Text only",
+};
 
 function AddProviderForm() {
   const addProvider = useProviderStore((s) => s.addProvider);
@@ -44,85 +67,104 @@ function AddProviderForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <h2 className="text-sm font-medium">Add a provider</h2>
-      <label className="flex flex-col gap-1 text-sm">
-        Provider
-        <select
-          className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-          value={kind}
-          onChange={(e) => setKind(e.target.value as ProviderKind)}
-        >
-          {PROVIDER_KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        {'Label (e.g. "claude-main", "ollama-home")'}
-        <input
-          className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          required
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Model
-        <input
-          className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-          placeholder="e.g. claude-sonnet-4-5, gpt-4o, gemini-2.0-flash, llava:13b"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          required
-        />
-      </label>
-      {meta.needsBaseUrl && (
-        <label className="flex flex-col gap-1 text-sm">
-          Base URL
-          <input
-            className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-            placeholder="http://127.0.0.1:11434"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            required
-          />
-        </label>
-      )}
-      <label className="flex flex-col gap-1 text-sm">
-        API key {kind === "ollama" && "(usually not needed for local Ollama)"}
-        <input
-          type="password"
-          className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        Role
-        <select
-          className="rounded border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-          value={role}
-          onChange={(e) => setRole(e.target.value as StoredProvider["role"])}
-        >
-          <option value="both">Vision + Text</option>
-          <option value="vision">Vision only (image matching)</option>
-          <option value="text">Text only (script/prompt work)</option>
-        </select>
-      </label>
-      <button
-        type="submit"
-        className="mt-2 w-fit rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
-      >
-        Add provider
-      </button>
-      <p className="text-xs text-neutral-500">
-        Keys are held only in memory for this session. Never sent anywhere except the
-        provider you pick, never written to the repo, never sent to Vercel.
-      </p>
-    </form>
+    <Card className="p-4">
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <SectionHeading>Add a provider</SectionHeading>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Provider" htmlFor="provider-kind">
+            <Select
+              id="provider-kind"
+              value={kind}
+              onChange={(e) => setKind(e.target.value as ProviderKind)}
+            >
+              {PROVIDER_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Label" htmlFor="provider-label" hint="How it appears in pickers.">
+            <Input
+              id="provider-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="claude-main"
+              required
+            />
+          </Field>
+
+          <Field label="Model" htmlFor="provider-model">
+            <Input
+              id="provider-model"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="claude-sonnet-4-5"
+              required
+            />
+          </Field>
+
+          <Field label="Role" htmlFor="provider-role">
+            <Select
+              id="provider-role"
+              value={role}
+              onChange={(e) => setRole(e.target.value as StoredProvider["role"])}
+            >
+              <option value="both">Vision + text</option>
+              <option value="vision">Vision only — image matching</option>
+              <option value="text">Text only — script and prompt work</option>
+            </Select>
+          </Field>
+
+          {meta.needsBaseUrl ? (
+            <Field label="Base URL" htmlFor="provider-url">
+              <Input
+                id="provider-url"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="http://127.0.0.1:11434"
+                required
+              />
+            </Field>
+          ) : null}
+
+          <Field
+            label="API key"
+            htmlFor="provider-key"
+            hint={kind === "ollama" ? "Usually not needed for local Ollama." : undefined}
+          >
+            <Input
+              id="provider-key"
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex items-start gap-1.5 text-label text-fg-muted">
+            <Icon name="info" size={13} className="mt-0.5 shrink-0" />
+            <span className="max-w-prose">
+              Keys are held in memory for this session only. They are sent to the provider you
+              choose and nowhere else — never written to the repo, never sent to Vercel.
+            </span>
+          </p>
+          <Button
+            type="submit"
+            variant="primary"
+            icon="plus"
+            disabled={!label.trim() || !model.trim()}
+            className="shrink-0"
+          >
+            Add provider
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
@@ -130,6 +172,7 @@ function ProviderRow({ provider }: { provider: StoredProvider }) {
   const testProvider = useProviderStore((s) => s.testProvider);
   const removeProvider = useProviderStore((s) => s.removeProvider);
   const [testing, setTesting] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   async function onTest() {
     setTesting(true);
@@ -141,35 +184,67 @@ function ProviderRow({ provider }: { provider: StoredProvider }) {
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
-      <div>
-        <div className="text-sm font-medium">{provider.id}</div>
-        <div className="text-xs text-neutral-500">
-          {provider.kind} · {provider.model} · {provider.role}
+    <Card className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-body font-medium text-fg">{provider.id}</span>
+          <Badge>{ROLE_LABELS[provider.role]}</Badge>
         </div>
-        {provider.lastTest && (
-          <div className={`text-xs ${provider.lastTest.ok ? "text-green-600" : "text-red-600"}`}>
-            {provider.lastTest.ok ? "✓ " : "✗ "}
+        <p className="mt-0.5 font-mono text-label text-fg-muted">
+          {provider.kind} · {provider.model}
+        </p>
+        {provider.lastTest ? (
+          <p
+            className={`mt-1 flex items-center gap-1 text-label ${
+              provider.lastTest.ok ? "text-success" : "text-destructive"
+            }`}
+          >
+            <Icon name={provider.lastTest.ok ? "check" : "alert"} size={12} />
             {provider.lastTest.message}
-          </div>
-        )}
+          </p>
+        ) : null}
       </div>
-      <div className="flex gap-2">
-        <button
-          onClick={onTest}
-          disabled={testing}
-          className="rounded border border-neutral-300 px-3 py-1 text-xs dark:border-neutral-700"
-        >
-          {testing ? "Testing…" : "Test"}
-        </button>
-        <button
-          onClick={() => removeProvider(provider.id)}
-          className="rounded border border-neutral-300 px-3 py-1 text-xs text-red-600 dark:border-neutral-700"
+
+      <div className="flex shrink-0 items-center gap-2">
+        <Button size="sm" loading={testing} onClick={() => void onTest()}>
+          {testing ? "Testing…" : "Test connection"}
+        </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          icon="trash"
+          onClick={() => setConfirmRemove(true)}
         >
           Remove
-        </button>
+        </Button>
       </div>
-    </div>
+
+      <Modal
+        open={confirmRemove}
+        onClose={() => setConfirmRemove(false)}
+        title="Remove provider"
+        description={`"${provider.id}" will be removed, along with its key for this session.`}
+        footer={
+          <>
+            <Button onClick={() => setConfirmRemove(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              icon="trash"
+              onClick={() => {
+                removeProvider(provider.id);
+                setConfirmRemove(false);
+              }}
+            >
+              Remove provider
+            </Button>
+          </>
+        }
+      >
+        <p className="text-label text-fg-muted">
+          Projects referencing this provider will fall back to asking you to pick another.
+        </p>
+      </Modal>
+    </Card>
   );
 }
 
@@ -177,18 +252,37 @@ export default function SettingsPage() {
   const providers = useProviderStore((s) => s.providers);
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-12">
-      <h1 className="text-xl font-semibold">Settings</h1>
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-neutral-500">Your providers</h2>
-        {providers.length === 0 && (
-          <p className="text-sm text-neutral-500">No providers added yet.</p>
-        )}
-        {providers.map((p) => (
-          <ProviderRow key={p.id} provider={p} />
-        ))}
-      </section>
-      <AddProviderForm />
-    </main>
+    <PageShell>
+      <div className="mx-auto max-w-3xl">
+        <PageHeader
+          title="Settings"
+          description="Connect the AI providers used for script analysis and image matching. Bring your own key — nothing is proxied through a server."
+        />
+
+        <section className="flex flex-col gap-3">
+          <SectionHeading>Your providers</SectionHeading>
+
+          {providers.length === 0 ? (
+            <EmptyState
+              icon="settings"
+              title="No providers connected"
+              description="Add a provider below to enable AI prompt rewriting, script analysis, and image-to-beat matching. The rest of the app works without one."
+            />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {providers.map((p) => (
+                <li key={p.id}>
+                  <ProviderRow provider={p} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <div className="mt-6">
+          <AddProviderForm />
+        </div>
+      </div>
+    </PageShell>
   );
 }

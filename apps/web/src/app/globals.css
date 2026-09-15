@@ -2,6 +2,97 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light dark;
+/*
+ * Semantic design tokens — see design-system/narrated-video-assembler/MASTER.md §2.
+ * Components reference these through Tailwind's semantic color names
+ * (bg-surface, text-fg-muted, border-border …), never raw hex.
+ */
+@layer base {
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --fg: #09090b;
+    --fg-muted: #52525b;
+    --fg-subtle: #71717a;
+    --border: #e4e4e7;
+    --border-strong: #d4d4d8;
+    --accent: #2563eb;
+    --accent-fg: #ffffff;
+    --accent-subtle: #eff6ff;
+    --success: #15803d;
+    --success-subtle: #f0fdf4;
+    --warning: #b45309;
+    --warning-subtle: #fffbeb;
+    --destructive: #dc2626;
+    --destructive-subtle: #fef2f2;
+    --ring: #2563eb;
+
+    color-scheme: light;
+  }
+
+  /*
+   * Dark is not inverted light: each token is re-picked, and elevation comes
+   * from lightening the surface rather than from shadows (invisible on dark).
+   */
+  .dark {
+    --bg: #0a0a0b;
+    --surface: #141416;
+    --surface-raised: #1c1c1f;
+    --fg: #fafafa;
+    --fg-muted: #a1a1aa;
+    --fg-subtle: #71717a;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --accent: #3b82f6;
+    --accent-fg: #ffffff;
+    --accent-subtle: #17233f;
+    --success: #4ade80;
+    --success-subtle: #14261a;
+    --warning: #fbbf24;
+    --warning-subtle: #2a1f07;
+    --destructive: #f87171;
+    --destructive-subtle: #2b1416;
+    --ring: #3b82f6;
+
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Numbers that update in place must not reflow their neighbours. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One focus treatment for the whole app. Never removed without replacement. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--accent);
+    color: var(--accent-fg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
