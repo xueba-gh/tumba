@@ -3,6 +3,13 @@ import type { Config } from "tailwindcss";
 /**
  * Tokens mirror design-system/narrated-video-assembler/MASTER.md.
  * Colors resolve to CSS variables so both themes work from one class name.
+ *
+ * Each var holds space-separated RGB channels and is composed here with
+ * <alpha-value>, which is what makes opacity modifiers work: `bg-accent/40`
+ * compiles to `rgb(var(--accent) / 0.4)`. Defining these as a bare
+ * `var(--accent)` silently breaks every `/opacity` utility — Tailwind cannot
+ * insert an alpha channel into an opaque colour string, so it emits nothing
+ * and the element paints transparent.
  */
 export default {
   content: ["./src/**/*.{ts,tsx}"],
@@ -10,24 +17,24 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: "var(--bg)",
-        surface: "var(--surface)",
-        "surface-raised": "var(--surface-raised)",
-        fg: "var(--fg)",
-        "fg-muted": "var(--fg-muted)",
-        "fg-subtle": "var(--fg-subtle)",
-        border: "var(--border)",
-        "border-strong": "var(--border-strong)",
-        accent: "var(--accent)",
-        "accent-fg": "var(--accent-fg)",
-        "accent-subtle": "var(--accent-subtle)",
-        success: "var(--success)",
-        "success-subtle": "var(--success-subtle)",
-        warning: "var(--warning)",
-        "warning-subtle": "var(--warning-subtle)",
-        destructive: "var(--destructive)",
-        "destructive-subtle": "var(--destructive-subtle)",
-        ring: "var(--ring)",
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        "surface-raised": "rgb(var(--surface-raised) / <alpha-value>)",
+        fg: "rgb(var(--fg) / <alpha-value>)",
+        "fg-muted": "rgb(var(--fg-muted) / <alpha-value>)",
+        "fg-subtle": "rgb(var(--fg-subtle) / <alpha-value>)",
+        border: "rgb(var(--border) / <alpha-value>)",
+        "border-strong": "rgb(var(--border-strong) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        "accent-fg": "rgb(var(--accent-fg) / <alpha-value>)",
+        "accent-subtle": "rgb(var(--accent-subtle) / <alpha-value>)",
+        success: "rgb(var(--success) / <alpha-value>)",
+        "success-subtle": "rgb(var(--success-subtle) / <alpha-value>)",
+        warning: "rgb(var(--warning) / <alpha-value>)",
+        "warning-subtle": "rgb(var(--warning-subtle) / <alpha-value>)",
+        destructive: "rgb(var(--destructive) / <alpha-value>)",
+        "destructive-subtle": "rgb(var(--destructive-subtle) / <alpha-value>)",
+        ring: "rgb(var(--ring) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],

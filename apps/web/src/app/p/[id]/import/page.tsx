@@ -256,7 +256,7 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
    * Promote any file with an audio track to the narration. Covers the common
    * case of an .mp4 whose name gave no hint that it is the voice-over.
    */
-  async function useAsVoiceOver(assetId: string) {
+  async function assignAsVoiceOver(assetId: string) {
     if (!project) return;
     const target = project.assets.find((a) => a.id === assetId);
     if (!target) return;
@@ -298,7 +298,7 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
   }
 
   /** Demote the narration back to a b-roll clip, clearing the audio track. */
-  async function useAsClip(assetId: string) {
+  async function assignAsClip(assetId: string) {
     if (!project) return;
     const target = project.assets.find((a) => a.id === assetId);
     if (!target) return;
@@ -430,6 +430,11 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
                 {project.audio.durationSec.toFixed(1)}s
               </span>
               <span className="truncate text-label text-fg-muted">{project.audio.fileRef}</span>
+              {project.audio.durationSec === 0 ? (
+                <Badge tone="warning" icon="alert">
+                  No audio decoded
+                </Badge>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2">
@@ -479,6 +484,15 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
               </div>
             )}
           </div>
+
+          {project.audio.durationSec === 0 ? (
+            <p className="mt-2 flex items-start gap-1.5 text-label text-warning">
+              <Icon name="alert" size={13} className="mt-0.5 shrink-0" />
+              This browser could not decode an audio track from{" "}
+              <span className="font-medium">{project.audio.fileRef}</span>. Its codec may be
+              unsupported — try exporting the narration as .mp3 or .wav.
+            </p>
+          ) : null}
         </Card>
       ) : null}
 
@@ -601,7 +615,7 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
                             canBeClip(asset.name) ? (
                               <button
                                 type="button"
-                                onClick={() => void useAsClip(asset.id)}
+                                onClick={() => void assignAsClip(asset.id)}
                                 className="cursor-pointer rounded-sm px-1 text-left text-label font-medium text-fg-muted transition-colors hover:text-fg"
                               >
                                 Use as clip instead
@@ -610,7 +624,7 @@ export default function ImportPage({ params: paramsPromise }: { params: Promise<
                           ) : (
                             <button
                               type="button"
-                              onClick={() => void useAsVoiceOver(asset.id)}
+                              onClick={() => void assignAsVoiceOver(asset.id)}
                               disabled={processing}
                               className="cursor-pointer rounded-sm px-1 text-left text-label font-medium text-accent transition-colors hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                             >

@@ -8,12 +8,14 @@
   "scripts": {
     "lint": "echo \"@nva/render-web: no lint target yet\"",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"@nva/render-web: no tests yet\""
+    "test": "vitest run"
   },
   "dependencies": {
-    "@nva/core": "workspace:*"
+    "@nva/core": "workspace:*",
+    "mp4-muxer": "^5.2.2"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^3.1.1"
   }
 }

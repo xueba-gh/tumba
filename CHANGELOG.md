@@ -1,6 +1,58 @@
 # Changelog
 
+## Phase 8 — Hardening & Complete Audit
+- Audited app features against `06_FEATURE_CHECKLIST.md`. Monorepo architecture complete across `packages/core`, `packages/ai`, `packages/render-web`, `apps/web`, and `apps/agent`.
+
+## Phase 7 — Render Agent (`apps/agent`)
+- Python 3.11 + FastAPI render agent in `apps/agent/main.py`:
+  - Endpoints: `GET /health`, `POST /align`, `POST /render`, `GET /job/{id}`, `GET /download/{id}`.
+  - `run.bat` / `run.sh` / `requirements.txt` for standalone agent execution.
+
+## Phase 6 — Deploy + Polish
+- Created `docs/USER_GUIDE.md` covering end-to-end usage, AI setup, project management, and render workflows.
+
+## Phase 5 — In-Browser Renderer (`packages/render-web`)
+- `packages/render-web`:
+  - **Painter (`painter.ts`)**: Ken Burns transform math (`computeKenBurnsTransform`), cover crop canvas painter, dissolve crossfades, End Card painter with SUBSCRIBE text & tagline.
+  - **Render Engine (`renderEngine.ts`)**: HTML5 / OffscreenCanvas 30 fps render loop, WebCodecs VideoEncoder H.264 / MediaRecorder export, frame progress & ETA calculator, SHA-256 fingerprint verification.
+- `apps/web`:
+  - **Visual Style Page (`/p/[id]/style`)**: Transition type selector (`dissolve`, `cut`, `fadeblack`), transition duration slider, Ken Burns zoom sliders, aspect ratio presets (16:9, 9:16, 1:1), and End Card text controls.
+  - **Render Page (`/p/[id]/render`)**: In-browser video render button, resolution preset picker (1080p, 4K, 720p Preview), real-time progress bar, in-app video player preview, MP4 download button, EDL & SRT timeline exports, and SHA-256 verification display.
+
+## Phase 4 — Narration Timing & Alignment
+- `apps/web/src/app/p/[id]/timing/page.tsx`:
+  - **Waveform Timeline Canvas**: Visual audio peak canvas displaying cut markers for every narration beat.
+  - **Narration Speed Control**: Interactive speed slider (0.85× – 1.25×) with live beat timing recomputation (`applySpeed`).
+  - **Hold Limits & Warnings**: Configurable min/max hold seconds with warning alerts for beats over max hold.
+  - **Audition Player**: Single-beat audio snippet audition player (`▶ Audition Beat`).
+  - **Whisper Alignment Shortcut**: One-click transcript-to-script alignment trigger.
+
 ## Phase 3 — Matching + review grid
+- **Fixed silent AI-matching failure**: `parseMatchingResponse` did
+  `data.matches ?? {}`, so a reply carrying only `notes` produced zero matches
+  and the UI reported "AI matching finished" after assigning nothing. The
+  parser now extracts the first *balanced* JSON object (the old greedy
+  first-brace-to-last-brace regex broke on prose or a second JSON block),
+  unwraps markdown fences, and accepts the shapes models actually emit: the
+  documented map, an array of `{beat, image}`, a bare map with no wrapper,
+  per-beat objects carrying confidence, and numeric/`IMAGE n` strings. An
+  unusable reply now throws with the response text included instead of
+  returning an empty mapping.
+- `matchByAiVision` returns `matchedCount` and `failures`, keeps going when one
+  batch fails, flags image numbers the model invented, and throws rather than
+  claiming success when nothing was applied. The match page now leads with
+  "Matched N of M beats" instead of echoing the model's prose.
+- Matching prompt states that `matches` is required and that an empty one is a
+  failed response.
+- **Live model discovery**: `AIProvider.listModels()` queries each provider's
+  list endpoint (Anthropic/OpenAI/OpenRouter `data[].id`, Gemini
+  `models[].name` filtered to `generateContent`, Ollama `/api/tags`). Settings
+  has a "Load" button that fills the model picker with ids the key can
+  actually call, so the app no longer depends on a hardcoded table that rots.
+- Settings model field: per-provider suggestions, provider-specific
+  placeholder, and inline validation that rejects a display name like
+  "gemini FLASH" (a space breaks Gemini, which puts the id in the URL path)
+  before a request is spent. Static fallback ids refreshed September 2026.
 - `apps/web/src/lib/matcher.ts`: deterministic match-by-number from leading
   filename numbers (`01_`, `beat-02-`, `03.`); AI vision matching that resizes
   candidates to 512px JPEG q70, batches to the provider's image limit, and

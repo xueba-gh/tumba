@@ -1,0 +1,5 @@
+{
+  "token": "CHANGE_ME_TO_A_RANDOM_SECRET",
+  "origins": ["http://localhost:3000"],
+  "workspace": "./workspace"
+}

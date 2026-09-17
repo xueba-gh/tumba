@@ -1,0 +1,7 @@
+# Required
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Optional: word-level alignment
+# Uncomment the line below to enable Whisper alignment:
+# faster-whisper>=1.1.0

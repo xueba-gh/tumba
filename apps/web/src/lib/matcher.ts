@@ -105,6 +105,17 @@ export async function resizeImageToThumbnailB64(blob: Blob): Promise<{ b64: stri
   });
 }
 
+/** Carries the provider's replies so the UI can show what actually came back. */
+export class MatchingError extends Error {
+  constructor(
+    message: string,
+    public readonly rawResponses: string[],
+  ) {
+    super(message);
+    this.name = "MatchingError";
+  }
+}
+
 export interface MatchByAiProgress {
   currentBatch: number;
   totalBatches: number;
@@ -130,7 +141,15 @@ export async function matchByAiVision(
   provider: AIProvider,
   onProgress?: (p: MatchByAiProgress) => void,
   options: MatchByAiOptions = {},
-): Promise<{ beats: Beat[]; notes: string }> {
+): Promise<{
+  beats: Beat[];
+  notes: string;
+  matchedCount: number;
+  failures: string[];
+  /** Verbatim provider replies. The request goes browser->provider, so this is
+   *  the only place the response can be inspected after the fact. */
+  rawResponses: string[];
+}> {
   const { onlyUnmatched = true } = options;
 
   const usedAssetIds = new Set(
@@ -194,6 +213,8 @@ export async function matchByAiVision(
   const batchSize = Math.max(1, provider.maxImagesPerRequest || 16);
   const totalBatches = Math.ceil(matchCandidates.length / batchSize);
   const aggregatedNotes: string[] = [];
+  const failures: string[] = [];
+  const rawResponses: string[] = [];
 
   const finalMatches = new Map<number, number>(); // beatN -> candidateIndex
   const finalConfidence = new Map<number, number>(); // beatN -> confidence
@@ -209,7 +230,18 @@ export async function matchByAiVision(
 
     const visionReq = buildMatchingVisionRequest(batchCandidates, matchBeats);
     const rawRes = await provider.vision(visionReq);
-    const result = parseMatchingResponse(rawRes);
+    rawResponses.push(rawRes);
+
+    // One bad batch should not lose the others; collect and report instead.
+    let result;
+    try {
+      result = parseMatchingResponse(rawRes);
+    } catch (err) {
+      failures.push(
+        `Batch ${b + 1} of ${totalBatches}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      continue;
+    }
 
     if (result.notes) aggregatedNotes.push(result.notes);
 
@@ -224,24 +256,51 @@ export async function matchByAiVision(
     }
   }
 
+  let matchedCount = 0;
+  const unknownIndices = new Set<number>();
+
   const updatedBeats = project.beats.map((beat) => {
     const matchedIndex = finalMatches.get(beat.n);
     if (matchedIndex !== undefined) {
       const assetId = candidateIdMap.get(matchedIndex);
       if (assetId) {
+        matchedCount++;
         return {
           ...beat,
           assetId,
           confidence: finalConfidence.get(beat.n) ?? 0.85,
         };
       }
+      // The model named an image number that was never sent.
+      unknownIndices.add(matchedIndex);
     }
     return beat;
   });
 
+  if (unknownIndices.size > 0) {
+    failures.push(
+      `The model referenced image numbers that were not sent: ${[...unknownIndices]
+        .sort((a, b) => a - b)
+        .join(", ")}.`,
+    );
+  }
+
+  // Reporting "finished" after assigning nothing is how a broken response
+  // looks like a successful run. Fail loudly instead.
+  if (matchedCount === 0) {
+    const detail = failures.length > 0 ? ` ${failures.join(" ")}` : "";
+    throw new MatchingError(
+      `The model returned a reply but none of it could be applied to a beat.${detail}`,
+      rawResponses,
+    );
+  }
+
   return {
     beats: updatedBeats,
     notes: aggregatedNotes.join("\n"),
+    matchedCount,
+    failures,
+    rawResponses,
   };
 }
 

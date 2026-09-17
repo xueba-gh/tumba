@@ -64,6 +64,12 @@ export interface AIProvider {
   chat(req: ChatRequest): Promise<string>;
   vision(req: VisionRequest): Promise<string>;
   testConnection(): Promise<TestConnectionResult>;
+  /**
+   * Model ids the account can actually call right now, newest-first where the
+   * provider gives an order. Queried live because hardcoded lists go stale:
+   * providers retire ids and restrict others to existing users.
+   */
+  listModels(): Promise<string[]>;
   estimateCost(req: ChatRequest | VisionRequest): CostEstimate;
 }
 

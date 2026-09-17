@@ -1,0 +1,124 @@
+{
+  "id": "sample-tiny-demo",
+  "name": "Tiny Demo",
+  "createdAt": "2026-09-01T00:00:00.000Z",
+  "updatedAt": "2026-09-01T00:00:00.000Z",
+  "version": "1",
+  "output": {
+    "aspect": "16:9",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "codec": "h264"
+  },
+  "audio": {
+    "fileRef": "media/narration.mp3",
+    "durationSec": 20.0,
+    "speed": 1.0,
+    "trimStartSec": 0,
+    "trimEndSec": 0,
+    "loudnessTarget": -16
+  },
+  "script": {
+    "text": "The morning sun rose above the distant mountains, casting a warm golden glow across the valley below. Birds began their chorus as the first light touched the treetops. Down in the meadow, wildflowers swayed gently in the breeze, their colours vivid against the dewy grass. A stream wound its way through the landscape, its water clear and sparkling. It was the kind of scene that made you pause, breathe deeply, and remember why the natural world matters.",
+    "language": "en"
+  },
+  "beats": [
+    {
+      "n": 1,
+      "text": "The morning sun rose above the distant mountains, casting a warm golden glow across the valley below. Birds began their chorus as the first light touched the treetops.",
+      "prompt": "Sunrise over mountain range, golden light flooding a valley, birds silhouetted against the sky",
+      "type": "image",
+      "assetId": "img-01",
+      "motion": "in"
+    },
+    {
+      "n": 2,
+      "text": "Down in the meadow, wildflowers swayed gently in the breeze, their colours vivid against the dewy grass.",
+      "prompt": "Meadow full of colourful wildflowers with morning dew, gentle breeze, soft sunlight",
+      "type": "image",
+      "assetId": "img-02",
+      "motion": "out"
+    },
+    {
+      "n": 3,
+      "text": "A stream wound its way through the landscape, its water clear and sparkling. It was the kind of scene that made you pause, breathe deeply, and remember why the natural world matters.",
+      "prompt": "Crystal clear stream winding through green landscape, sparkling water, peaceful natural scene",
+      "type": "image",
+      "assetId": "img-03",
+      "motion": "in"
+    }
+  ],
+  "assets": [
+    {
+      "id": "img-01",
+      "kind": "image",
+      "name": "01_sunrise_mountains.jpg",
+      "fileRef": "media/01_sunrise_mountains.jpg",
+      "sha256": "",
+      "width": 1920,
+      "height": 1080,
+      "tags": [],
+      "spare": false
+    },
+    {
+      "id": "img-02",
+      "kind": "image",
+      "name": "02_meadow_wildflowers.jpg",
+      "fileRef": "media/02_meadow_wildflowers.jpg",
+      "sha256": "",
+      "width": 1920,
+      "height": 1080,
+      "tags": [],
+      "spare": false
+    },
+    {
+      "id": "img-03",
+      "kind": "image",
+      "name": "03_stream_landscape.jpg",
+      "fileRef": "media/03_stream_landscape.jpg",
+      "sha256": "",
+      "width": 1920,
+      "height": 1080,
+      "tags": [],
+      "spare": false
+    },
+    {
+      "id": "audio-narration",
+      "kind": "audio",
+      "name": "narration.mp3",
+      "fileRef": "media/narration.mp3",
+      "sha256": "",
+      "width": 0,
+      "height": 0,
+      "tags": [],
+      "spare": false
+    }
+  ],
+  "style": {
+    "transition": "dissolve",
+    "transitionSec": 0.5,
+    "kenBurns": {
+      "zoomMin": 1.035,
+      "zoomMax": 1.04,
+      "alternate": true
+    },
+    "endCard": {
+      "enabled": true,
+      "title": "SUBSCRIBE",
+      "tagline": "Thanks for watching",
+      "seconds": 5,
+      "mode": "lastframe"
+    }
+  },
+  "timing": {
+    "mode": "proportional",
+    "startsAtBeat": 1,
+    "minHoldSec": 4,
+    "maxHoldSec": 15
+  },
+  "ai": {},
+  "changeLog": [
+    { "at": "2026-09-01T00:00:00.000Z", "what": "Created sample project" }
+  ]
+}

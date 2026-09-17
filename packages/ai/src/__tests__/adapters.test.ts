@@ -105,3 +105,83 @@ describe("estimateCost", () => {
     expect(est.inputTokens).toBe(Math.ceil(400 / 4) + 800);
   });
 });
+
+describe("listModels", () => {
+  it("anthropic reads data[].id and sends the api key header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ data: [{ id: "claude-opus-5" }, { id: "claude-sonnet-5" }] }),
+    );
+    const provider = createProvider(
+      { id: "a", kind: "anthropic", model: "m", apiKey: "sk-test" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    expect(await provider.listModels()).toEqual(["claude-opus-5", "claude-sonnet-5"]);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain("/models");
+    expect((init.headers as Record<string, string>)["x-api-key"]).toBe("sk-test");
+  });
+
+  it("openai reads data[].id with a bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: "gpt-6-astra" }] }));
+    const provider = createProvider(
+      { id: "o", kind: "openai", model: "m", apiKey: "sk-oai" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    expect(await provider.listModels()).toEqual(["gpt-6-astra"]);
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-oai");
+  });
+
+  it("gemini strips the models/ prefix and drops models without generateContent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        models: [
+          { name: "models/gemini-3.8-flash", supportedGenerationMethods: ["generateContent"] },
+          { name: "models/text-embedding-004", supportedGenerationMethods: ["embedContent"] },
+        ],
+      }),
+    );
+    const provider = createProvider(
+      { id: "g", kind: "gemini", model: "m", apiKey: "k" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    expect(await provider.listModels()).toEqual(["gemini-3.8-flash"]);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("key=k");
+  });
+
+  it("ollama reads its own tags shape", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ models: [{ name: "llava:13b" }, { name: "llama3.2-vision" }] }),
+    );
+    const provider = createProvider(
+      { id: "ol", kind: "ollama", model: "m", apiKey: "" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    expect(await provider.listModels()).toEqual(["llava:13b", "llama3.2-vision"]);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("/api/tags");
+  });
+
+  it("surfaces the provider status code on failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ error: "bad key" }, false, 401));
+    const provider = createProvider(
+      { id: "g", kind: "gemini", model: "m", apiKey: "nope" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    await expect(provider.listModels()).rejects.toThrow(/401/);
+  });
+
+  it("returns an empty list rather than throwing when the provider has none", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
+    const provider = createProvider(
+      { id: "o", kind: "openai", model: "m", apiKey: "k" },
+      fetchMock as unknown as typeof fetch,
+    );
+
+    expect(await provider.listModels()).toEqual([]);
+  });
+});

@@ -7,6 +7,7 @@ import {
   matchByNumber,
   matchByAiVision,
   computeCoverageReport,
+  MatchingError,
   type CoverageReport,
 } from "@/lib/matcher";
 import { useProviderStore } from "@/lib/providerStore";
@@ -43,6 +44,9 @@ export default function MatchPage({ params: paramsPromise }: { params: Promise<{
 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The provider is called straight from the browser, so nothing server-side
+  // records the reply. Keep it here so a bad response can be read in the UI.
+  const [rawResponses, setRawResponses] = useState<string[]>([]);
 
   const providers = useProviderStore((s) => s.providers);
   const keyStore = useProviderStore((s) => s.keyStore);
@@ -194,9 +198,16 @@ export default function MatchPage({ params: paramsPromise }: { params: Promise<{
     const provider = createProvider(cfg);
     setAiMatching(true);
     setError(null);
+    setRawResponses([]);
 
     try {
-      const { beats: updatedBeats, notes } = await matchByAiVision(
+      const {
+        beats: updatedBeats,
+        notes,
+        matchedCount,
+        failures,
+        rawResponses: replies,
+      } = await matchByAiVision(
         project,
         provider,
         (prog) => setAiProgressText(prog.statusText),
@@ -204,9 +215,18 @@ export default function MatchPage({ params: paramsPromise }: { params: Promise<{
       );
 
       await persist({ ...project, beats: updatedBeats });
-      setNotice(notes ? `AI matching finished. ${notes}` : "AI matching finished.");
+      setRawResponses(replies);
+
+      // Lead with the count — the model's prose says nothing about what landed.
+      const target = aiTargetBeats.length;
+      setNotice(
+        `Matched ${matchedCount} of ${target} beat${target === 1 ? "" : "s"}.` +
+          (notes ? ` ${notes}` : ""),
+      );
+      if (failures.length > 0) setError(failures.join(" "));
     } catch (err) {
       setError(`AI matching failed: ${err instanceof Error ? err.message : String(err)}`);
+      setRawResponses(err instanceof MatchingError ? err.rawResponses : []);
     } finally {
       setAiMatching(false);
       setAiProgressText("");
@@ -262,6 +282,36 @@ export default function MatchPage({ params: paramsPromise }: { params: Promise<{
           <span className="flex-1">{error}</span>
           <IconButton label="Dismiss error" icon="close" size="sm" onClick={() => setError(null)} />
         </div>
+      ) : null}
+
+      {rawResponses.length > 0 ? (
+        <details className="mb-4 rounded-md border border-border bg-surface px-3 py-2">
+          <summary className="cursor-pointer text-label font-medium text-fg">
+            Show the model&rsquo;s reply
+            <span className="ml-1.5 font-normal text-fg-muted">
+              ({rawResponses.length} {rawResponses.length === 1 ? "batch" : "batches"})
+            </span>
+          </summary>
+          <p className="mt-2 text-label text-fg-muted">
+            Sent browser-to-provider, so this is the only record of it.
+          </p>
+          {rawResponses.map((r, i) => (
+            <pre
+              key={i}
+              className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-border bg-bg p-2 font-mono text-label text-fg"
+            >
+              {r}
+            </pre>
+          ))}
+          <Button
+            size="sm"
+            icon="copy"
+            className="mt-2"
+            onClick={() => void navigator.clipboard.writeText(rawResponses.join("\n\n---\n\n"))}
+          >
+            Copy
+          </Button>
+        </details>
       ) : null}
 
       {notice ? (
@@ -621,7 +671,7 @@ export default function MatchPage({ params: paramsPromise }: { params: Promise<{
             type="checkbox"
             checked={rematchAll}
             onChange={(e) => setRematchAll(e.target.checked)}
-            className="mt-0.5 cursor-pointer accent-[var(--accent)]"
+            className="mt-0.5 cursor-pointer accent-accent"
           />
           <span>
             Re-match every beat

@@ -15,6 +15,7 @@
   "dependencies": {
     "@nva/ai": "workspace:*",
     "@nva/core": "workspace:*",
+    "@nva/render-web": "workspace:*",
     "@nva/ui": "workspace:*",
     "next": "^15.0.3",
     "react": "^18.3.1",

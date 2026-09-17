@@ -307,6 +307,58 @@ export function createProvider(cfg: ProviderConfig, fetchImpl: FetchLike = fetch
     }
   }
 
+  /**
+   * Every provider exposes a list endpoint, so the app asks rather than
+   * shipping a table of ids that rots. Shapes differ:
+   *   anthropic/openai/openrouter/compatible -> { data: [{ id }] }
+   *   gemini -> { models: [{ name: "models/x", supportedGenerationMethods }] }
+   *   ollama -> { models: [{ name }] }
+   */
+  async function listModels(): Promise<string[]> {
+    try {
+      if (cfg.kind === "gemini") {
+        const res = await doFetch(
+          `${base}/models?key=${encodeURIComponent(cfg.apiKey)}&pageSize=200`,
+          { method: "GET" },
+          TIMEOUT_TEXT_MS,
+        );
+        const body = (await res.json()) as {
+          models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
+        };
+        return (body.models ?? [])
+          .filter(
+            (m) =>
+              !m.supportedGenerationMethods ||
+              m.supportedGenerationMethods.includes("generateContent"),
+          )
+          .map((m) => (m.name ?? "").replace(/^models\//, ""))
+          .filter(Boolean);
+      }
+
+      if (cfg.kind === "ollama") {
+        const res = await doFetch(`${base}/api/tags`, { method: "GET" }, TIMEOUT_TEXT_MS);
+        const body = (await res.json()) as { models?: Array<{ name?: string }> };
+        return (body.models ?? []).map((m) => m.name ?? "").filter(Boolean);
+      }
+
+      const headers: Record<string, string> =
+        cfg.kind === "anthropic"
+          ? {
+              "x-api-key": cfg.apiKey,
+              "anthropic-version": "2023-06-01",
+              "anthropic-dangerous-direct-browser-access": "true",
+            }
+          : { authorization: `Bearer ${cfg.apiKey}` };
+
+      const res = await doFetch(`${base}/models`, { method: "GET", headers }, TIMEOUT_TEXT_MS);
+      const body = (await res.json()) as { data?: Array<{ id?: string }> };
+      return (body.data ?? []).map((m) => m.id ?? "").filter(Boolean);
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      throw new ProviderError(`${cfg.kind} listModels failed: ${String(err)}`, cfg.id, err);
+    }
+  }
+
   function estimateCost(req: ChatRequest | VisionRequest): CostEstimate {
     const text = "text" in req ? req.text : req.messages.map((m) => m.content).join(" ");
     const imageCount = "images" in req ? req.images.length : 0;
@@ -327,6 +379,7 @@ export function createProvider(cfg: ProviderConfig, fetchImpl: FetchLike = fetch
     chat,
     vision,
     testConnection,
+    listModels,
     estimateCost,
   };
 }
