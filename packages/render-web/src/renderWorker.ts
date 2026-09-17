@@ -45,7 +45,13 @@ export interface WorkerErrorMsg {
 
 export type WorkerOutMsg = WorkerProgressMsg | WorkerResultMsg | WorkerErrorMsg;
 
-const ctx = globalThis as unknown as DedicatedWorkerGlobalScope;
+// Minimal worker-scope shape; the WebWorker lib conflicts with DOM in this tsconfig.
+interface WorkerScope {
+  onmessage: ((event: MessageEvent<WorkerInput>) => void) | null;
+  postMessage(message: WorkerOutMsg, transfer?: Transferable[]): void;
+}
+
+const ctx = globalThis as unknown as WorkerScope;
 
 ctx.onmessage = async (event: MessageEvent<WorkerInput>) => {
   try {
